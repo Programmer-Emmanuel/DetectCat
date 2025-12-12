@@ -71,7 +71,7 @@ export default function Detection() {
       const formData = new FormData();
       formData.append('file', selectedFile);
 
-      const response = await fetch('https://route.com/detect', {
+      const response = await fetch('http://127.0.0.1:8000/detect', {
         method: 'POST',
         body: formData,
       });
