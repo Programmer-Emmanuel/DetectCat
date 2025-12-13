@@ -6,6 +6,7 @@ import 'aos/dist/aos.css';
 interface DetectionResult {
   success: boolean;
   message: string;
+  probability?: number;
 }
 
 export default function Detection() {
@@ -24,31 +25,43 @@ export default function Detection() {
 
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (file) {
-      setSelectedFile(file);
-      setResult(null);
+    if (!file) return;
 
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setPreviewUrl(reader.result as string);
-      };
-      reader.readAsDataURL(file);
+    if (!file.type.startsWith('image/')) {
+      setResult({
+        success: false,
+        message: 'Veuillez choisir une image valide.',
+      });
+      return;
     }
+
+    setSelectedFile(file);
+    setResult(null);
+
+    const reader = new FileReader();
+    reader.onloadend = () => setPreviewUrl(reader.result as string);
+    reader.readAsDataURL(file);
   };
 
   const handleDrop = (event: React.DragEvent<HTMLDivElement>) => {
     event.preventDefault();
     const file = event.dataTransfer.files?.[0];
-    if (file && file.type.startsWith('image/')) {
-      setSelectedFile(file);
-      setResult(null);
+    if (!file) return;
 
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setPreviewUrl(reader.result as string);
-      };
-      reader.readAsDataURL(file);
+    if (!file.type.startsWith('image/')) {
+      setResult({
+        success: false,
+        message: 'Veuillez déposer une image valide.',
+      });
+      return;
     }
+
+    setSelectedFile(file);
+    setResult(null);
+
+    const reader = new FileReader();
+    reader.onloadend = () => setPreviewUrl(reader.result as string);
+    reader.readAsDataURL(file);
   };
 
   const handleDragOver = (event: React.DragEvent<HTMLDivElement>) => {
@@ -71,17 +84,21 @@ export default function Detection() {
       const formData = new FormData();
       formData.append('file', selectedFile);
 
-      const response = await fetch('http://127.0.0.1:8000/detect', {
+      const response = await fetch('https://api-detectcat.onrender.com/detect', {
         method: 'POST',
         body: formData,
       });
 
-      const data: DetectionResult = await response.json();
+      if (!response.ok) {
+        throw new Error('Erreur API');
+      }
+
+      const data = await response.json();
       setResult(data);
     } catch (error) {
       setResult({
         success: false,
-        message: 'Erreur lors de la détection. Veuillez réessayer.',
+        message: 'Erreur lors de la détection. Vérifiez l’API puis réessayez.',
       });
     } finally {
       setLoading(false);
@@ -91,6 +108,8 @@ export default function Detection() {
   return (
     <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white py-12 md:py-16">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+        
+        {/* Header */}
         <div className="text-center mb-12" data-aos="fade-up">
           <h1 className="text-4xl md:text-5xl font-bold mb-4 bg-gradient-to-r from-blue-600 to-blue-800 bg-clip-text text-transparent">
             Détection de Chats
@@ -100,6 +119,7 @@ export default function Detection() {
           </p>
         </div>
 
+        {/* Upload zone */}
         <div className="bg-white rounded-3xl shadow-xl p-8 mb-8" data-aos="fade-up" data-aos-delay="100">
           {!previewUrl ? (
             <div
@@ -109,7 +129,6 @@ export default function Detection() {
             >
               <input
                 type="file"
-                name="file"
                 id="file-upload"
                 accept="image/*"
                 onChange={handleFileSelect}
@@ -126,9 +145,7 @@ export default function Detection() {
                     </p>
                     <p className="text-gray-500">ou cliquez pour parcourir</p>
                   </div>
-                  <p className="text-sm text-gray-400">
-                    PNG, JPG, JPEG jusqu'à 10MB
-                  </p>
+                  <p className="text-sm text-gray-400">PNG, JPG, JPEG</p>
                 </div>
               </label>
             </div>
@@ -142,7 +159,7 @@ export default function Detection() {
                 />
                 <button
                   onClick={clearFile}
-                  className="absolute top-4 right-4 bg-white p-2 rounded-full shadow-lg hover:bg-gray-100 transition-colors duration-200"
+                  className="absolute top-4 right-4 bg-white p-2 rounded-full shadow-lg hover:bg-gray-100 transition-colors"
                 >
                   <X className="w-5 h-5 text-gray-600" />
                 </button>
@@ -151,7 +168,7 @@ export default function Detection() {
               <button
                 onClick={handleDetection}
                 disabled={loading}
-                className="w-full bg-gradient-to-r from-blue-500 to-blue-700 text-white font-semibold py-4 rounded-xl shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none flex items-center justify-center space-x-2"
+                className="w-full bg-gradient-to-r from-blue-500 to-blue-700 text-white font-semibold py-4 rounded-xl shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-300 disabled:opacity-50 disabled:transform-none flex items-center justify-center space-x-2"
               >
                 {loading ? (
                   <>
@@ -169,6 +186,7 @@ export default function Detection() {
           )}
         </div>
 
+        {/* Résultat */}
         {result && (
           <div
             data-aos="zoom-in"
@@ -190,6 +208,7 @@ export default function Detection() {
                   <XCircle className="w-8 h-8 text-red-600" />
                 )}
               </div>
+
               <div className="flex-1">
                 <h3
                   className={`text-2xl font-bold mb-2 ${
@@ -198,6 +217,7 @@ export default function Detection() {
                 >
                   {result.success ? 'Chat détecté !' : 'Aucun chat détecté'}
                 </h3>
+
                 <p
                   className={`text-lg ${
                     result.success ? 'text-green-700' : 'text-red-700'
@@ -205,10 +225,18 @@ export default function Detection() {
                 >
                   {result.message}
                 </p>
+
+                {/* Affichage optionnel de la probabilité */}
+                {result.probability !== undefined && (
+                  <p className="mt-2 text-gray-600">
+                    Confiance du modèle : <strong>{(result.probability * 100).toFixed(1)}%</strong>
+                  </p>
+                )}
               </div>
             </div>
           </div>
         )}
+
       </div>
     </div>
   );
